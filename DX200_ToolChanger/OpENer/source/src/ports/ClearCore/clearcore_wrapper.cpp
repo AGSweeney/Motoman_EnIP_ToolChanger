@@ -136,6 +136,9 @@ int ConnectorA12_GetState(void) {
     return ConnectorA12.State() ? 1 : 0;
 }
 
+/* NOTE: Not reentrant -- uses a static buffer.  Safe on bare-metal
+ * single-core (all callers are main-loop context), but must NOT be
+ * called from ISR if interrupt-driven logging is ever added. */
 void ClearCoreTraceOutput(const char *format, ...) {
     static char buffer[512];
     va_list args;
@@ -211,6 +214,7 @@ static int32_t          tc_position     = 0;   /* normalised 0 .. 35999  */
 
 /* Track accumulated motor position for relative-move strategy */
 static int32_t          tc_motor_abs_pos = 0;
+static int8_t           tc_move_dir      = 0;  /* +1 = CW, -1 = CCW, 0 = stopped */
 
 /* Homing sub-phase:
  *   0 = move off sensor (if already on it)
@@ -351,6 +355,22 @@ int ToolChanger_IsMotorReady(void) {
             !TC_MOTOR.StatusReg().bit.AlertsPresent) ? 1 : 0;
 }
 
+int ToolChanger_GetMoveDirection(void) {
+    return (int)tc_move_dir;
+}
+
+int ToolChanger_GetHlfbState(void) {
+    MotorDriver::HlfbStates s = TC_MOTOR.HlfbState();
+    if (s == MotorDriver::HLFB_ASSERTED)        return 1;
+    if (s == MotorDriver::HLFB_HAS_MEASUREMENT) return 2;
+    return 0;  /* HLFB_DEASSERTED or HLFB_UNKNOWN */
+}
+
+int ToolChanger_GetTorquePercent(void) {
+    /* HlfbPercent() returns -100.0 to +100.0 when in HLFB_HAS_MEASUREMENT */
+    return (int)TC_MOTOR.HlfbPercent();
+}
+
 void ToolChanger_HomeStart(void) {
     if (tc_state == TC_STATE_FAULTED) {
         TC_LOG("TC_HomeStart: Cannot home while faulted\n");
@@ -433,6 +453,7 @@ void ToolChanger_SelectTool(uint8_t tool_number) {
     TC_MOTOR.Move(delta, MotorDriver::MOVE_TARGET_REL_END_POSN);
 
     tc_motor_abs_pos += delta;
+    tc_move_dir      = (delta > 0) ? 1 : -1;
     tc_state         = TC_STATE_MOVING;
     tc_move_start_ms = GetMillis();
 
@@ -457,6 +478,7 @@ void ToolChanger_Cyclic(void) {
             }
             TC_MOTOR.EnableRequest(false);
             tc_awaiting_hlfb = 0;
+            tc_move_dir      = 0;
 
             if (tc_state != TC_STATE_FAULTED) {
                 tc_state     = TC_STATE_DISABLED;
@@ -500,6 +522,7 @@ void ToolChanger_Cyclic(void) {
                 TC_MOTOR.MoveStopAbrupt();
             }
             TC_MOTOR.EnableRequest(false);
+            tc_move_dir = 0;
 
             if (tc_state != TC_STATE_FAULTED) {
                 tc_state     = TC_STATE_DISABLED;
@@ -657,14 +680,16 @@ void ToolChanger_Cyclic(void) {
                 tc_current_tool = tc_tool_at_position(tc_position);
 
                 if (tc_current_tool == tc_target_tool) {
-                    tc_state = TC_STATE_AT_TOOL;
+                    tc_state    = TC_STATE_AT_TOOL;
+                    tc_move_dir = 0;
                     TC_LOG("TC_Cyclic: Arrived at tool %d "
                                       "(pos=%ld)\n",
                                       tc_current_tool, (long)tc_position);
                 } else {
                     /* Position error -- not at expected tool */
                     tc_fault_code |= TC_FAULT_POSITION_ERROR;
-                    tc_state = TC_STATE_FAULTED;
+                    tc_state    = TC_STATE_FAULTED;
+                    tc_move_dir = 0;
                     TC_LOG("TC_Cyclic: Position error! "
                                       "Expected tool %d, at tool %d (pos=%ld)\n",
                                       tc_target_tool, tc_current_tool,
@@ -679,7 +704,8 @@ void ToolChanger_Cyclic(void) {
                 (GetMillis() - tc_move_start_ms) >= TC_MOVE_TIMEOUT_MS) {
                 TC_MOTOR.MoveStopAbrupt();
                 tc_fault_code |= TC_FAULT_HLFB_TIMEOUT;
-                tc_state = TC_STATE_FAULTED;
+                tc_state    = TC_STATE_FAULTED;
+                tc_move_dir = 0;
                 TC_LOG("TC_Cyclic: MOVE TIMEOUT -- "
                                   "move did not complete within %lu ms\n",
                                   (unsigned long)TC_MOVE_TIMEOUT_MS);
@@ -721,19 +747,20 @@ void ToolChanger_ClearFaults(void) {
 
     /* 2. Always cycle the motor enable -- this is required to clear
      *    ClearPath alerts, and is harmless for non-motor faults.
-     *    The full disable-wait-enable sequence ensures the drive
-     *    resets its internal state regardless of fault type. */
+     *    Keep delays minimal to avoid starving the EIP stack.
+     *    ClearPath minimum disable pulse is ~1ms; 2ms+1ms is safe. */
     TC_MOTOR.EnableRequest(false);
-    Delay_ms(20);
+    Delay_ms(2);
     TC_MOTOR.ClearAlerts();
-    Delay_ms(10);
+    Delay_ms(1);
 
     /* 3. Reset all tool changer state */
-    tc_fault_code  = TC_FAULT_NONE;
-    tc_info_code   = TC_INFO_NONE;
-    tc_state       = TC_STATE_DISABLED;
-    tc_home_done   = 0;
-    tc_home_phase  = 0;
+    tc_fault_code    = TC_FAULT_NONE;
+    tc_info_code     = TC_INFO_NONE;
+    tc_state         = TC_STATE_DISABLED;
+    tc_home_done     = 0;
+    tc_home_phase    = 0;
+    tc_move_dir      = 0;
     tc_awaiting_hlfb = 0;
     tc_hlfb_drop_ms  = 0;
 
@@ -761,8 +788,17 @@ ToolChangerState ToolChanger_GetState(void) {
     return tc_state;
 }
 
+extern "C" { extern volatile int g_eip_scanner_connected; }
+int EIP_IsScannerConnected(void) {
+    return g_eip_scanner_connected;
+}
+
 uint8_t ToolChanger_GetCurrentTool(void) {
     return tc_current_tool;
+}
+
+uint8_t ToolChanger_GetTargetTool(void) {
+    return tc_target_tool;
 }
 
 int32_t ToolChanger_GetPosition(void) {
@@ -884,17 +920,14 @@ EipStatus IfaceApplyConfiguration(TcpIpInterface *iface, CipTcpIpObject *tcpip) 
     
     if (tcpip->hostname.string != NULL && tcpip->hostname.length > 0) {
 #if LWIP_NETIF_HOSTNAME
-        if (tcpip->hostname.string[tcpip->hostname.length] == '\0') {
-            netif_set_hostname(iface, (const char *)tcpip->hostname.string);
-            OPENER_TRACE_INFO("IfaceApplyConfiguration: Hostname set to '%s'\n", tcpip->hostname.string);
-        } else {
-            static char hostname_buffer[65];
-            size_t copy_len = (tcpip->hostname.length < 64) ? tcpip->hostname.length : 64;
-            memcpy(hostname_buffer, tcpip->hostname.string, copy_len);
-            hostname_buffer[copy_len] = '\0';
-            netif_set_hostname(iface, hostname_buffer);
-            OPENER_TRACE_INFO("IfaceApplyConfiguration: Hostname set to '%s'\n", hostname_buffer);
-        }
+        /* Always copy into a safe buffer to guarantee null termination
+         * without reading past the declared hostname length. */
+        static char hostname_buffer[65];
+        size_t copy_len = (tcpip->hostname.length < 64) ? tcpip->hostname.length : 64;
+        memcpy(hostname_buffer, tcpip->hostname.string, copy_len);
+        hostname_buffer[copy_len] = '\0';
+        netif_set_hostname(iface, hostname_buffer);
+        OPENER_TRACE_INFO("IfaceApplyConfiguration: Hostname set to '%s'\n", hostname_buffer);
 #endif
     }
     

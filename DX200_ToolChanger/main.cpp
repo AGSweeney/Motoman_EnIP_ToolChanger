@@ -16,10 +16,15 @@
 /* Tool changer wrapper -- provides ToolChanger_*() API and constants */
 #include "ports/ClearCore/clearcore_wrapper.h"
 
+/* HMI display -- 4D Systems Gen4-uLCD-70DCT-CLB on COM-0 */
+#include "toolchanger_hmi.h"
+
 /* State name lookup for debug printing */
 static const char *tc_state_names[] = {
     "DISABLED", "HOMING", "IDLE", "MOVING", "AT_TOOL", "FAULTED"
 };
+
+/* (Touch command handler removed -- HMI is status-only) */
 
 int main(void) {
     /* ================================================================
@@ -43,8 +48,8 @@ int main(void) {
 
     ConnectorUsb.SendLine("\r\n========================================");
     ConnectorUsb.SendLine("  DX200 Rotary Tool Changer -- ClearCore");
-    ConnectorUsb.SendLine("  SDSK 3600ppr | 10:1 Gearbox | 6 Pockets");
     ConnectorUsb.SendLine("========================================\r\n");
+
     ConnectorUsb.SendLine("Motor M-0 configured (Step+Dir, HLFB bipolar PWM)");
     ConnectorUsb.SendLine("Waiting for Ethernet link...");
     ConnectorUsb.Flush();
@@ -116,10 +121,16 @@ int main(void) {
         snprintf(statusMsg, sizeof(statusMsg), "OpENer init: FAILED (g_end_stack=%d)", opener_status);
         ConnectorUsb.SendLine(statusMsg);
     }
+    /* ---- Initialise HMI display (COM-0, 115200 baud) ---- */
+    ConnectorUsb.SendLine("Initializing HMI display (COM-0)...");
+    ConnectorUsb.Flush();
+    HMI_Init(115200);
+    ConnectorUsb.SendLine("HMI display ready.");
+
     ConnectorUsb.SendLine("\r\n--- Initialization complete -- entering main loop ---\r\n");
     ConnectorUsb.Flush();
 
-    /* ---- Main loop timing & link state tracking ---- */
+    /* ---- Main loop ---- */
     uint32_t lastOpenerCall  = 0;
     uint32_t lastStatusPrint = 0;
     uint32_t lastLedBlink    = 0;
@@ -196,5 +207,12 @@ int main(void) {
 
             lastStatusPrint = currentTime;
         }
+
+        /* HMI display update (internally throttled to ~20 Hz) */
+        HMI_Cyclic();
+        
+        /* Minimal delay -- EthernetMgr.Refresh() and opener_cyclic()
+         * need frequent calls for responsive EIP communication. */
+        Delay_ms(1);
     }
 }

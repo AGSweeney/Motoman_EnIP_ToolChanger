@@ -1,6 +1,6 @@
-main.d main.o: .././main.cpp ../../libClearCore/inc/ClearCore.h \
- ../../libClearCore/inc/AdcManager.h ../../libClearCore/inc/IirFilter.h \
- ../../libClearCore/inc/SysTiming.h \
+diablo16_serial.d diablo16_serial.o: .././diablo16_serial.cpp \
+ ../../libClearCore/inc/ClearCore.h ../../libClearCore/inc/AdcManager.h \
+ ../../libClearCore/inc/IirFilter.h ../../libClearCore/inc/SysTiming.h \
  ../../libClearCore/inc/CcioBoardManager.h \
  ../../libClearCore/inc/CcioPin.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/sam.h \
@@ -159,28 +159,7 @@ main.d main.o: .././main.cpp ../../libClearCore/inc/ClearCore.h \
  ../../libClearCore/inc/SysManager.h \
  ../../libClearCore/inc/MotorManager.h \
  ../../libClearCore/inc/SdCardDriver.h ../../libClearCore/inc/SerialUsb.h \
- ../../libClearCore/inc/XBeeDriver.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/opener.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/socket_types.h \
- ../../LwIP/LwIP/src/include/lwip/api.h \
- ../../LwIP/LwIP/src/include/lwip/netbuf.h \
- ../../LwIP/LwIP/src/include/lwip/sys.h \
- ../../LwIP/LwIP/port/include/arch/sys_arch.h \
- ../../LwIP/LwIP/src/include/lwip/inet.h \
- ../../LwIP/LwIP/src/include/lwip/sockets.h \
- ../../LwIP/LwIP/src/include/lwip/errno.h \
- ../../LwIP/LwIP/src/include/lwip/netdb.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip/ciptcpipinterface.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/typedefs.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore/platform_network_includes.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore/socket_types.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip/ciptypes.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore/socket_types.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports/networkhandler.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\utils/enipmessage.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore\dx200_toolchanger/opener_user_conf.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/clearcore_wrapper.h \
- .././toolchanger_hmi.h
+ ../../libClearCore/inc/XBeeDriver.h .././diablo16_serial.h
 
 ../../libClearCore/inc/ClearCore.h:
 
@@ -520,44 +499,4 @@ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include
 
 ../../libClearCore/inc/XBeeDriver.h:
 
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/opener.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/socket_types.h:
-
-../../LwIP/LwIP/src/include/lwip/api.h:
-
-../../LwIP/LwIP/src/include/lwip/netbuf.h:
-
-../../LwIP/LwIP/src/include/lwip/sys.h:
-
-../../LwIP/LwIP/port/include/arch/sys_arch.h:
-
-../../LwIP/LwIP/src/include/lwip/inet.h:
-
-../../LwIP/LwIP/src/include/lwip/sockets.h:
-
-../../LwIP/LwIP/src/include/lwip/errno.h:
-
-../../LwIP/LwIP/src/include/lwip/netdb.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip/ciptcpipinterface.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/typedefs.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore/platform_network_includes.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore/socket_types.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip/ciptypes.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore/socket_types.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports/networkhandler.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\utils/enipmessage.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore\dx200_toolchanger/opener_user_conf.h:
-
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/clearcore_wrapper.h:
-
-.././toolchanger_hmi.h:
+.././diablo16_serial.h:

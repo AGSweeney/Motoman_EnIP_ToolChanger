@@ -81,6 +81,9 @@
 EipUint8 g_assembly_data_input[6];    /* T->O  (Input, instance 100) */
 EipUint8 g_assembly_data_output[3];   /* O->T  (Output, instance 150) */
 
+/* ---- EIP scanner connection state (accessed from clearcore_wrapper) ---- */
+volatile int g_eip_scanner_connected = 0;
+
 /* ---- Output assembly bit masks ---- */
 /* Byte 0: tool select only */
 #define OUT_TOOL_SELECT_MASK    0x07  /* byte 0, bits 0-2: tool number 1-6 */
@@ -234,16 +237,15 @@ void CheckIoConnectionEvent(unsigned int output_assembly_id,
   (void) output_assembly_id;
   (void) input_assembly_id;
 
-  if (io_connection_event == kIoConnectionEventClosed ||
-      io_connection_event == kIoConnectionEventTimedOut) {
-    /* Safety: disable motor if the EIP connection drops.
-     * DI-8 must be cycled (low -> high) to re-enable after reconnection. */
-    OPENER_TRACE_INFO("CheckIoConnectionEvent: Connection lost, disabling motor\n");
-    ToolChanger_EnableMotor(0);
+  if (io_connection_event == kIoConnectionEventOpened) {
+    g_eip_scanner_connected = 1;
+    OPENER_TRACE_INFO("CheckIoConnectionEvent: Scanner connected\n");
+  }
+  else if (io_connection_event == kIoConnectionEventClosed ||
+           io_connection_event == kIoConnectionEventTimedOut) {
+    g_eip_scanner_connected = 0;
+    OPENER_TRACE_INFO("CheckIoConnectionEvent: Connection lost\n");
 
-    /* Reset edge-detection state and output buffer so that when the
-     * connection is re-established, the first commands are detected
-     * as rising edges rather than being silently missed. */
     memset(g_assembly_data_output, 0, sizeof(g_assembly_data_output));
     prev_cmd_byte    = 0;
     prev_tool_select = 0;
@@ -287,19 +289,26 @@ EipStatus AfterAssemblyDataReceived(CipInstance *instance) {
       }
 
       /* --- Tool Select + Execute --- */
-      /* Trigger on: rising edge of Execute, OR tool number change while
-       * Execute is held high.  This lets the DX200 keep Execute asserted
-       * and simply write a new tool number to byte 0 to command new moves. */
+      /* Trigger ONLY on tool-number CHANGE while Execute is held high.
+       * Execute rising edge alone does NOT command a move -- this prevents
+       * re-commanding the old tool after homing or re-enabling.
+       * The DX200 keeps Execute asserted and simply writes a new tool
+       * number to byte 0 to command new moves. */
       {
         uint8_t tool = g_assembly_data_output[0] & OUT_TOOL_SELECT_MASK;
-        int execute_rising = (rising & OUT_EXECUTE_BIT) != 0;
-        int tool_changed   = (tool != prev_tool_select) && (cmd & OUT_EXECUTE_BIT);
-        prev_tool_select   = tool;
+        int tool_changed = (tool != prev_tool_select) && (cmd & OUT_EXECUTE_BIT);
 
-        if (execute_rising || tool_changed) {
-          OPENER_TRACE_INFO("AfterAssemblyDataReceived: Execute tool change to tool %d (%s)\n",
-                            tool, execute_rising ? "execute edge" : "tool changed");
+        if (tool != 0 && tool_changed) {
+          OPENER_TRACE_INFO("EIP: SelectTool %d (prev=%d cmd=0x%02X)\n",
+                            tool, prev_tool_select, cmd);
           ToolChanger_SelectTool(tool);
+        }
+
+        /* Only update prev_tool_select while Execute is asserted so that
+         * tool changes made while Execute is low are remembered and
+         * trigger a move the next cycle Execute is high with a new tool. */
+        if (cmd & OUT_EXECUTE_BIT) {
+          prev_tool_select = tool;
         }
       }
 

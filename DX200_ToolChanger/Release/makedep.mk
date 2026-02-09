@@ -6,7 +6,9 @@ Device_Startup\startup_same53.c
 
 main.cpp
 
-max7219_display.cpp
+diablo16_serial.cpp
+
+toolchanger_hmi.cpp
 
 OpENer\source\src\cip\appcontype.c
 

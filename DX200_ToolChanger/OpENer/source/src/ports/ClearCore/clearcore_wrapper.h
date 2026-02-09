@@ -126,6 +126,20 @@ void ToolChanger_EnableMotor(int enable);
 /* Returns non-zero if the motor is enabled and HLFB is asserted. */
 int  ToolChanger_IsMotorReady(void);
 
+/* Returns the move direction: +1 = CW, -1 = CCW, 0 = not moving. */
+int  ToolChanger_GetMoveDirection(void);
+
+/* Returns non-zero if an EtherNet/IP scanner has an active I/O connection. */
+int  EIP_IsScannerConnected(void);
+
+/* Returns the HLFB state: 0 = off/deasserted, 1 = asserted (servo locked),
+ * 2 = has measurement (PWM torque data available during motion). */
+int  ToolChanger_GetHlfbState(void);
+
+/* Returns the measured torque as a percentage of peak torque (-100 to +100).
+ * Only valid when ToolChanger_GetHlfbState() returns 2. */
+int  ToolChanger_GetTorquePercent(void);
+
 /* Start homing sequence.  Uses DI-6 as the home sensor input.
  * Homing moves the turret slowly until the sensor triggers, then
  * zeroes the position counter. */
@@ -154,6 +168,9 @@ ToolChangerState ToolChanger_GetState(void);
 /* Returns the tool number (1-6) that the turret is currently at,
  * or 0 if the position is unknown / between tools. */
 uint8_t ToolChanger_GetCurrentTool(void);
+
+/* Returns the tool number (1-6) that was last commanded, or 0 if none. */
+uint8_t ToolChanger_GetTargetTool(void);
 
 /* Returns the current motor position in counts (normalised 0-35999). */
 int32_t ToolChanger_GetPosition(void);

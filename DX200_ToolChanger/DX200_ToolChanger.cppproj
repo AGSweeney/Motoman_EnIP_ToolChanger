@@ -311,7 +311,10 @@
     <Compile Include="main.cpp">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="max7219_display.cpp">
+    <Compile Include="diablo16_serial.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="toolchanger_hmi.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="OpENer\source\src\cip\appcontype.c">
