@@ -164,11 +164,9 @@ Before commanding a tool change:
 //NAME TC_COLD_START
 NOP
 <span style="color:magenta">'WAIT FAULT OFF</span>
-*WAIT_FAULT_OFF
 WAIT IN#(207)=OFF
 TIMER T=0.10
 <span style="color:magenta">'WAIT MOTOR ENABLED</span>
-*WAIT_MOTOR
 WAIT IN#(206)=ON
 TIMER T=0.20
 <span style="color:magenta">'SET NULL TOOL</span>
@@ -183,11 +181,9 @@ TIMER T=0.10
 <span style="color:magenta">'RESET HOME COMMAND</span>
 DOUT OG#(27) 0
 <span style="color:magenta">'WAIT FOR HOME</span>
-*WAIT_HOME_DONE
 WAIT IN#(205)=ON
 TIMER T=0.10
 <span style="color:magenta">'WAIT FOR IDLE STATE</span>
-*WAIT_IDLE
 WAIT IN#(209)=OFF
 WAIT IN#(210)=ON
 WAIT IN#(211)=OFF
@@ -207,7 +203,6 @@ NOP
 <span style="color:magenta">'B009 = NEW TOOL REQUESTED (1-6)</span>
 <span style="color:magenta">'B010 = POCKET POSITION, B011 = CURRENT TOOL IN SPINDLE</span>
 <span style="color:magenta">'PRE-CHECK: FAULT, MOTOR, HOME</span>
-*CHECK_READY
 IF IN#(207)=ON,JMP *FAULT_HANDLE  <span style="color:magenta">'Fault Present</span>
 IF IN#(206)=OFF,JMP *NOT_ENABLED  <span style="color:magenta">'Motor Enabled</span>
 IF IN#(205)=OFF,JMP *NOT_HOMED  <span style="color:magenta">'Home Complete</span>
@@ -215,7 +210,6 @@ IF B009&lt;1,JMP *INVALID_TOOL
 IF B009&gt;6,JMP *INVALID_TOOL
 <span style="color:blue">MOVL</span> P000 V=100 PL=0  <span style="color:magenta">'P_LOW_OUT</span>
 <span style="color:magenta">'SYNC B011 WITH SPINDLE: IF NO TOOL, CLEAR STALE VALUE</span>
-*CHECK_HAS_TOOL
 IF &lt;Placeholder HAS_TOOL&gt;=ON,JMP *HAS_TOOL
 SET B011 0  <span style="color:magenta">'Sync: spindle empty, clear stale tool number</span>
 JMP *ROTATE_TO_NEW
@@ -226,7 +220,6 @@ SET B010 B011
 DOUT OG#(27) 1  <span style="color:magenta">'Execute</span>
 TIMER T=0.02
 DOUT OG#(26) B010  <span style="color:magenta">'Tool Select</span>
-*WAIT_PUTAWAY_POS
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 IF IN#(215)=ON,JMP *POCKET_OCCUPIED  <span style="color:magenta">'Tool In Pocket (must be empty)</span>
@@ -235,7 +228,6 @@ DOUT OT#(xxx) ON  <span style="color:magenta">'Spindle Release</span>
 TIMER T=0.50
 <span style="color:blue">MOVL</span> P002 V=100 PL=0  <span style="color:magenta">'P_HIGH_IN</span>
 DOUT OG#(26) B009  <span style="color:magenta">'Tool Select (new tool)</span>
-*WAIT_NEW_POS
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 JMP *RETRIEVE
@@ -243,7 +235,6 @@ JMP *RETRIEVE
 DOUT OG#(27) 1  <span style="color:magenta">'Execute</span>
 TIMER T=0.02
 DOUT OG#(26) B009  <span style="color:magenta">'Tool Select</span>
-*WAIT_NEW_POS2
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 *RETRIEVE
@@ -251,7 +242,6 @@ IF &lt;Placeholder HAS_TOOL&gt;=ON,JMP *SPINDLE_NOT_EMPTY  <span style="color:ma
 <span style="color:blue">MOVL</span> P002 V=100 PL=0  <span style="color:magenta">'P_HIGH_IN (approach from above)</span>
 <span style="color:blue">MOVL</span> P001 V=100 PL=0  <span style="color:magenta">'P_LOW_IN (descend, grab)</span>
 DOUT OT#(xxx) OFF  <span style="color:magenta">'Spindle Grab</span>
-*WAIT_TOOL_LOADED
 WAIT &lt;Placeholder HAS_TOOL&gt;=ON
 TIMER T=0.20
 <span style="color:blue">MOVL</span> P000 V=100 PL=0  <span style="color:magenta">'P_LOW_OUT</span>
@@ -298,7 +288,6 @@ END</code></pre>
 //NAME TC_PUT_AWAY_TOOL
 NOP
 <span style="color:magenta">'PRE-CHECK: FAULT, MOTOR, HOME</span>
-*CHECK_READY
 IF IN#(207)=ON,JMP *FAULT_HANDLE  <span style="color:magenta">'Fault Present</span>
 IF IN#(206)=OFF,JMP *NOT_ENABLED  <span style="color:magenta">'Motor Enabled</span>
 IF IN#(205)=OFF,JMP *NOT_HOMED  <span style="color:magenta">'Home Complete</span>
@@ -312,7 +301,6 @@ IF B011&gt;6,JMP *INVALID_TOOL
 DOUT OG#(27) 1  <span style="color:magenta">'Execute</span>
 TIMER T=0.02
 DOUT OG#(26) B011  <span style="color:magenta">'Tool Select (put-away pocket)</span>
-*WAIT_PUTAWAY_POS
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 IF IN#(215)=ON,JMP *POCKET_OCCUPIED  <span style="color:magenta">'Tool In Pocket (must be empty)</span>
@@ -342,7 +330,6 @@ END</code></pre>
 //NAME TC_GRAB_TOOL
 NOP
 <span style="color:magenta">'PRE-CHECK: FAULT, MOTOR, HOME</span>
-*CHECK_READY
 IF IN#(207)=ON,JMP *FAULT_HANDLE  <span style="color:magenta">'Fault Present</span>
 IF IN#(206)=OFF,JMP *NOT_ENABLED  <span style="color:magenta">'Motor Enabled</span>
 IF IN#(205)=OFF,JMP *NOT_HOMED  <span style="color:magenta">'Home Complete</span>
@@ -354,13 +341,11 @@ IF B009&gt;6,JMP *INVALID_TOOL
 DOUT OG#(27) 1  <span style="color:magenta">'Execute</span>
 TIMER T=0.02
 DOUT OG#(26) B009  <span style="color:magenta">'Tool Select</span>
-*WAIT_AT_POS
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 <span style="color:blue">MOVL</span> P002 V=100 PL=0  <span style="color:magenta">'P_HIGH_IN (approach from above)</span>
 <span style="color:blue">MOVL</span> P001 V=100 PL=0  <span style="color:magenta">'P_LOW_IN (descend, grab)</span>
 DOUT OT#(xxx) OFF  <span style="color:magenta">'Spindle Grab</span>
-*WAIT_TOOL_LOADED
 WAIT &lt;Placeholder HAS_TOOL&gt;=ON
 TIMER T=0.20
 <span style="color:blue">MOVL</span> P000 V=100 PL=0  <span style="color:magenta">'P_LOW_OUT</span>
@@ -387,7 +372,6 @@ TIMER T=0.05
 DOUT OG#(27) 8  <span style="color:magenta">'Clear Faults</span>
 TIMER T=0.10
 DOUT OG#(27) 0
-*WAIT_CLEAR
 WAIT IN#(207)=OFF  <span style="color:magenta">'Fault Present</span>
 TIMER T=0.20
 RET
