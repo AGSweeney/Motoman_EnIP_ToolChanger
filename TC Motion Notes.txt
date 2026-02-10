@@ -1,0 +1,5 @@
+If the the robot has a tool. I will move to TC Low Out Positionto put it into the correct pocket. That pocket must be empty before proceeding.
+
+It will move from low out to low in, release the tool and move to the high in position (hovering above the tool in the carosel)
+
+If the robot doe NOT have a tool and it is going to grab one it will go to the HIGH in position first and then to the low in position to grab the tool and the low out position to clear the tool changer.
