@@ -400,13 +400,13 @@ END</code></pre>
 
 | Group | Dir | Byte | Value / Bits | Meaning |
 |-------|-----|------|--------------|---------|
-| OG26 | out | 0 | 0–6 | Tool Select (1–6) |
-| OG27 | out | 1 | 0 | All commands off |
-| OG27 | out | 1 | 1 | Execute Move |
-| OG27 | out | 1 | 2 | Home Request |
-| OG27 | out | 1 | 8 | Clear Faults |
-| IG26 | in | 0 | bits 0–7 | Current Tool, At Position, Home Complete, Motor Enabled, Fault, In Motion |
-| IG27 | in | 1 | bits 0–7 | State, Invalid Tool, Not Ready, E-Stop, Tool In Pocket |
+| OG#(26) | out | 0 | 0–6 | Tool Select (1–6) |
+| OG#(27) | out | 1 | 0 | All commands off |
+| OG#(27) | out | 1 | 1 | Execute Move |
+| OG#(27) | out | 1 | 2 | Home Request |
+| OG#(27) | out | 1 | 8 | Clear Faults |
+| IG#26 | in | 0 | bits 0–7 | Current Tool, At Position, Home Complete, Motor Enabled, Fault, In Motion |
+| IG#27 | in | 1 | bits 0–7 | State, Invalid Tool, Not Ready, E-Stop, Tool In Pocket |
 
 ---
 
