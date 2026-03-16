@@ -91,7 +91,8 @@ Write the desired tool pocket as a simple integer (1-6). Bits 3-7 are reserved.
 | 1   | `0x02` | Home Request | Rising edge starts homing sequence              |
 | 2   | `0x04` | Reserved     | Motor enable is via DI-8 hardware input         |
 | 3   | `0x08` | Clear Faults | Rising edge clears latched faults               |
-| 4-7 |        | Reserved     | --                                               |
+| 4   | `0x10` | Tool Engage  | While ON, suppresses AT_TOOL HLFB-drop faulting |
+| 5-7 |        | Reserved     | --                                               |
 
 **Byte 2 -- Auxiliary Digital Outputs**
 
@@ -125,7 +126,7 @@ Write the desired tool pocket as a simple integer (1-6). Bits 3-7 are reserved.
 | 4      | `0x10` | Not Ready      | Command ignored (wrong state). Non-fatal, self-clearing |
 | 5      | `0x20` | E-Stop Active  | A-10 NC input low -- motor enable blocked              |
 | 6      | `0x40` | Tool In Pocket | DI-7 sensor: 1 = tool present in current pocket       |
-| 7      |        | Reserved       | --                                                     |
+| 7      | `0x80` | Tool Engage Echo | Mirrors Output Byte 1 bit 4 (Tool Engage command)  |
 
 State machine values (bits 0-2):
 
@@ -197,7 +198,8 @@ stateDiagram-v2
 4. Wait for Home Complete (input byte 0, bit 4) and state = IDLE
 5. Write tool number to byte 0 (e.g. `3`), set Execute: write byte 1 = `0x01`
 6. Wait for At Position (input byte 0, bit 3) and state = AT_TOOL
-7. To change tools: write new tool number to byte 0 while Execute stays high
+7. During tool put/pull contact: set Tool Engage (`byte1 |= 0x10`), verify echo (`input byte1 bit7 = 1`), then clear when clear of contact
+8. To change tools: write new tool number to byte 0 while Execute stays high
 
 ### Homing Sequence
 
@@ -218,7 +220,7 @@ If the turret is already on the home sensor (DI-6) when homing starts, it moves 
 - **HLFB timeout** (fault code `0x0002`): Three detection scenarios:
   - **Post-enable**: After DI-8 enables the motor, HLFB must assert within 2 seconds. If it doesn't, the motor is disabled and a fault is raised. Detects: motor not connected, wiring fault, drive not configured.
   - **Move completion**: A tool-change move must complete within 5 seconds. If it doesn't, motion is stopped and a fault is raised. Detects: mechanical jam, stall, lost steps.
-  - **Unexpected loss**: While in IDLE or AT_TOOL, HLFB must remain asserted. If it drops for more than 100 ms, a fault is raised. Detects: power loss, intermittent wiring, drive fault without alert bit.
+  - **Unexpected loss**: While in IDLE HLFB must remain asserted. At AT_TOOL, this check is active unless Tool Engage (output byte1 bit4) is ON. If active and HLFB drops for more than 100 ms, a fault is raised. Detects: power loss, intermittent wiring, drive fault without alert bit.
 - **Invalid tool numbers** (0 or 7): Silently ignored with an informational code in byte 1 -- no fault, no motion.
 - **DI-8 while faulted**: Rising edge is ignored. Clear faults first.
 - **Fault clear during E-stop**: Faults can be cleared while E-stop is active, but the motor will not re-enable until E-stop is released and DI-8 is cycled.
@@ -323,7 +325,7 @@ These messages are printed immediately when events occur, independent of the OpE
 | `TC_Cyclic: HLFB asserted after enable (Nms)` | Motor confirmed ready after enable |
 | `TC_Cyclic: HLFB TIMEOUT after enable -- ... N ms` | Motor did not respond within 2 seconds |
 | `TC_Cyclic: HLFB LOST in IDLE -- deasserted for >100 ms` | Unexpected HLFB drop while idle |
-| `TC_Cyclic: HLFB LOST in AT_TOOL -- deasserted for >100 ms` | Unexpected HLFB drop while at tool |
+| `TC_Cyclic: HLFB LOST in AT_TOOL -- deasserted for >100 ms` | Unexpected HLFB drop while at tool (only when Tool Engage is OFF) |
 
 **Homing**
 

@@ -189,6 +189,14 @@ uint8_t ToolChanger_GetInfoCode(void);
  * While active, motor enable is blocked and all motion is inhibited. */
 int  ToolChanger_IsEstopActive(void);
 
+/* Set tool-engage mode from EIP command Byte 1 bit 4.
+ * When enabled, unexpected HLFB loss at AT_TOOL is ignored so the robot can
+ * mechanically engage/disengage tools without nuisance faulting. */
+void ToolChanger_SetToolEngageMode(int enabled);
+
+/* Returns non-zero while tool-engage mode is active. */
+int  ToolChanger_GetToolEngageMode(void);
+
 #ifdef __cplusplus
 }
 #endif

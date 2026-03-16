@@ -29,7 +29,8 @@
  * Byte 1, bit 1    : Home Request (rising-edge starts homing)
  * Byte 1, bit 2    : Reserved (motor enable is via DI-8 hardware input)
  * Byte 1, bit 3    : Clear Faults (rising-edge)
- * Byte 1, bits 4-7 : Reserved
+ * Byte 1, bit 4    : Tool Engage Mode (suppress AT_TOOL HLFB drop faulting)
+ * Byte 1, bits 5-7 : Reserved
  * Byte 2, bits 0-2 : Reserved (IO-0..IO-2 are stacklight, firmware-driven)
  * Byte 2, bits 3-5 : Auxiliary digital outputs (IO-3..IO-5)
  * Byte 2, bits 6-7 : Reserved
@@ -47,7 +48,7 @@
  * Byte 1, bit 4    : Info: Not Ready (non-fatal, self-clearing)
  * Byte 1, bit 5    : E-Stop Active (A-10 NC input low)
  * Byte 1, bit 6    : Tool In Pocket (DI-7 sensor, 1 = tool present)
- * Byte 1, bit 7    : Reserved
+ * Byte 1, bit 7    : Tool Engage Echo (mirrors Output Byte 1 bit 4)
  * Bytes 2-3        : Fault Code (UINT16, little-endian, ToolChangerFault bitmask)
  * Byte 4           : Current Tool Pocket (1-6, 0 = unknown)
  * Byte 5           : Digital inputs (DI-6..DI-8, A-9..A-12, bits 0-6)
@@ -93,6 +94,7 @@ volatile int g_eip_scanner_connected = 0;
 #define OUT_HOME_BIT            0x02  /* byte 1, bit 1: home request */
 /* byte 1, bit 2 (0x04): reserved -- motor enable is via DI-8 hardware input */
 #define OUT_CLEAR_FAULTS_BIT    0x08  /* byte 1, bit 3: clear faults */
+#define OUT_TOOL_ENGAGE_BIT     0x10  /* byte 1, bit 4: suppress AT_TOOL HLFB drop fault */
 
 /* ---- Input assembly bit masks (byte 0) ---- */
 #define IN_TOOL_MASK            0x07  /* bits 0-2: current tool 1-6 */
@@ -108,6 +110,7 @@ volatile int g_eip_scanner_connected = 0;
 #define IN_INFO_NOT_READY       0x10  /* bit 4: command ignored, not ready (non-fatal) */
 #define IN_ESTOP_ACTIVE_BIT     0x20  /* bit 5: E-stop active (A-10 NC input low) */
 #define IN_TOOL_IN_POCKET_BIT   0x40  /* bit 6: DI-7 tool-in-pocket sensor */
+#define IN_TOOL_ENGAGE_ECHO_BIT 0x80  /* bit 7: mirrors tool engage command state */
 
 /* ---- Edge-detection state for rising-edge triggers ---- */
 static EipUint8 prev_cmd_byte    = 0;   /* previous byte 1 (command bits) */
@@ -261,6 +264,7 @@ void CheckIoConnectionEvent(unsigned int output_assembly_id,
  *   Byte 1 [1]   = Home (rising edge)
  *   Byte 1 [2]   = Reserved (enable via DI-8)
  *   Byte 1 [3]   = Clear faults (rising edge)
+ *   Byte 1 [4]   = Tool Engage Mode (suppress AT_TOOL HLFB drop faulting)
  *   Byte 2 [5:3] = Auxiliary digital outputs (IO-3..IO-5)
  *   Byte 2 [2:0] = Reserved (stacklight is firmware-driven)
  ******************************************************************************/
@@ -272,6 +276,10 @@ EipStatus AfterAssemblyDataReceived(CipInstance *instance) {
       EipUint8 cmd    = g_assembly_data_output[1];      /* command byte */
       EipUint8 rising = cmd & ~prev_cmd_byte;           /* detect rising edges */
       prev_cmd_byte   = cmd;
+
+      /* Byte 1 bit 4 is level-driven: while asserted, ignore AT_TOOL HLFB drop
+       * faulting to allow tool engage/disengage without nuisance faults. */
+      ToolChanger_SetToolEngageMode((cmd & OUT_TOOL_ENGAGE_BIT) ? 1 : 0);
 
       /* Motor enable is handled by DI-8 hardware input in ToolChanger_Cyclic.
        * No enable/disable logic needed here. */
@@ -350,6 +358,7 @@ EipStatus AfterAssemblyDataReceived(CipInstance *instance) {
  *   Byte 1 [4]   = Info: Not ready (non-fatal)
  *   Byte 1 [5]   = E-Stop Active (A-10 NC input low)
  *   Byte 1 [6]   = Tool in pocket (DI-7 sensor)
+ *   Byte 1 [7]   = Tool Engage Echo (mirrors output byte 1 bit 4)
  *   Bytes 2-3    = Fault code (UINT16 LE)
  *   Byte 4       = Current tool pocket (1-6, 0 = unknown)
  *   Byte 5       = Digital inputs (DI-6..DI-8, A-9..A-12)
@@ -397,6 +406,9 @@ EipBool8 BeforeAssemblyDataSend(CipInstance *pa_pstInstance) {
     }
     if (ConnectorDI7_GetState()) {
       g_assembly_data_input[1] |= IN_TOOL_IN_POCKET_BIT;
+    }
+    if (ToolChanger_GetToolEngageMode()) {
+      g_assembly_data_input[1] |= IN_TOOL_ENGAGE_ECHO_BIT;
     }
 
     /* Bytes 2-3: fault code (UINT16, little-endian) */

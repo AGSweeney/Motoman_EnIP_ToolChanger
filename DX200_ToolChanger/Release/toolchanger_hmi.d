@@ -161,7 +161,7 @@ toolchanger_hmi.d toolchanger_hmi.o: .././toolchanger_hmi.cpp \
  ../../libClearCore/inc/SdCardDriver.h ../../libClearCore/inc/SerialUsb.h \
  ../../libClearCore/inc/XBeeDriver.h .././toolchanger_hmi.h \
  .././diablo16_serial.h \
- D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/clearcore_wrapper.h
+ Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/clearcore_wrapper.h
 
 ../../libClearCore/inc/ClearCore.h:
 
@@ -505,4 +505,4 @@ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include
 
 .././diablo16_serial.h:
 
-D:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/clearcore_wrapper.h:
+Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src/ports/ClearCore/clearcore_wrapper.h:

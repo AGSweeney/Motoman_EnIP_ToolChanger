@@ -249,6 +249,7 @@ static unsigned long    tc_enable_request_ms = 0;  /* timestamp of last enable  
 static int              tc_awaiting_hlfb     = 0;  /* 1 = enabled, waiting for HLFB */
 static unsigned long    tc_move_start_ms     = 0;  /* timestamp of move start   */
 static unsigned long    tc_hlfb_drop_ms      = 0;  /* first deassert seen (0=ok)*/
+static int              tc_tool_engage_mode  = 0;  /* EIP byte1 bit4: ignore AT_TOOL HLFB drop */
 
 /* Fault-clear override: when non-zero, DI-8 is temporarily ignored
  * while the enable is being cycled to clear a ClearPath fault. */
@@ -714,20 +715,27 @@ void ToolChanger_Cyclic(void) {
 
         case TC_STATE_AT_TOOL:
             /* Stable at tool pocket -- nothing to do until next command.
-             * Unexpected HLFB loss (Scenario 3) -- same check as IDLE. */
-            if (TC_MOTOR.HlfbState() != MotorDriver::HLFB_ASSERTED) {
-                if (tc_hlfb_drop_ms == 0) {
-                    tc_hlfb_drop_ms = GetMillis();
-                } else if ((GetMillis() - tc_hlfb_drop_ms) >=
-                           TC_HLFB_DROP_DEBOUNCE_MS) {
-                    tc_fault_code |= TC_FAULT_HLFB_TIMEOUT;
-                    tc_state = TC_STATE_FAULTED;
-                    TC_LOG("TC_Cyclic: HLFB LOST in AT_TOOL "
-                                      "-- deasserted for >%lu ms\n",
-                                      (unsigned long)TC_HLFB_DROP_DEBOUNCE_MS);
-                }
+             * Unexpected HLFB loss (Scenario 3) -- same check as IDLE.
+             * Exception: while robot is engaging/disengaging a tool,
+             * suppress AT_TOOL HLFB drop faulting to avoid nuisance faults
+             * caused by slight carousel disturbance. */
+            if (tc_tool_engage_mode) {
+                tc_hlfb_drop_ms = 0;  /* prevent stale debounce carry-over */
             } else {
-                tc_hlfb_drop_ms = 0;
+                if (TC_MOTOR.HlfbState() != MotorDriver::HLFB_ASSERTED) {
+                    if (tc_hlfb_drop_ms == 0) {
+                        tc_hlfb_drop_ms = GetMillis();
+                    } else if ((GetMillis() - tc_hlfb_drop_ms) >=
+                               TC_HLFB_DROP_DEBOUNCE_MS) {
+                        tc_fault_code |= TC_FAULT_HLFB_TIMEOUT;
+                        tc_state = TC_STATE_FAULTED;
+                        TC_LOG("TC_Cyclic: HLFB LOST in AT_TOOL "
+                                          "-- deasserted for >%lu ms\n",
+                                          (unsigned long)TC_HLFB_DROP_DEBOUNCE_MS);
+                    }
+                } else {
+                    tc_hlfb_drop_ms = 0;
+                }
             }
             break;
 
@@ -819,6 +827,14 @@ uint8_t ToolChanger_GetInfoCode(void) {
 
 int ToolChanger_IsEstopActive(void) {
     return tc_estop_active;
+}
+
+void ToolChanger_SetToolEngageMode(int enabled) {
+    tc_tool_engage_mode = (enabled != 0) ? 1 : 0;
+}
+
+int ToolChanger_GetToolEngageMode(void) {
+    return tc_tool_engage_mode;
 }
 
 }  /* extern "C" -- end of tool changer block */

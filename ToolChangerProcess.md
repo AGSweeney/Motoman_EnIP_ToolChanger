@@ -82,6 +82,7 @@ Before commanding a tool change:
 | Motor enabled | IN#206 | ON |
 | Home complete | IN#205 | ON |
 | Ready (IDLE or AT_TOOL) | State bits IN#209–211 | 2 or 4 |
+| Tool Engage echo (when commanded) | IN#216 | Matches OUT#213 |
 
 ### 2.4 Execute Move Behavior
 
@@ -97,6 +98,7 @@ Before commanding a tool change:
    - Rotate carousel to pocket B011 (put-away pocket).
    - Wait for At Position.
    - **If** pocket not empty (Tool In Pocket = 1): abort — pocket occupied.
+   - Assert Tool Engage (`OUT#213=ON`) and verify echo (`IN#216=ON`).
    - Move low out → **P_LOW_IN**.
    - Release tool (spindle release).
    - Move to **P_HIGH_IN** (hovering above tool in carousel).
@@ -111,6 +113,7 @@ Before commanding a tool change:
    - Deactivate spindle release.
    - Wait for `<Placeholder HAS_TOOL>` (spindle confirms tool loaded).
    - Retract to **P_LOW_OUT**.
+   - Deassert Tool Engage (`OUT#213=OFF`) and verify echo (`IN#216=OFF`).
 
 ### 2.6 Grab Safety Rule
 
@@ -131,25 +134,26 @@ Before commanding a tool change:
 'WRITE: DOUT OG#(group) value   READ: DIN Bxxx IG#group
 '
 'OUTPUT GROUP 26 OG#(26): BYTE 0 = TOOL SELECT (1-6)
-'OUTPUT GROUP 27 OG#(27): BYTE 1 = EXECUTE(1), HOME(2), CLEAR FAULTS(8)
+'OUTPUT GROUP 27 OG#(27): BYTE 1 = EXECUTE(1), HOME(2), CLEAR FAULTS(8), TOOL ENGAGE(16)
 'OUTPUT GROUP 28 OG#(28): BYTE 2 = AUX OUTPUTS
 'INPUT GROUP 26 IG#26:    BYTE 0 = STATUS
 'INPUT GROUP 27 IG#27:    BYTE 1 = STATE, INFO
 '
 'KEY OUTPUTS DOUT OG#(26)/OG#(27):
 '  OG#(26) = TOOL NUMBER (1-6)
-'  OG#(27) = 1 EXECUTE, 2 HOME, 8 CLEAR FAULTS
+'  OG#(27) = 1 EXECUTE, 2 HOME, 8 CLEAR FAULTS, 16 TOOL ENGAGE
 '
 'KEY INPUTS DIN Bxxx IG#26/IG#27: READ BYTE INTO VARIABLE
 '  IG#26: BITS 0-2 CURRENT TOOL, 3 AT POSITION, 4 HOME COMPLETE,
 '         5 MOTOR ENABLED, 6 FAULT, 7 IN MOTION
 '  IG#27: BITS 0-2 STATE, 3 INVALID TOOL, 4 NOT READY,
-'         5 E-STOP, 6 TOOL IN POCKET
+'         5 E-STOP, 6 TOOL IN POCKET, 7 TOOL ENGAGE ECHO
 'IN#(204) = AT POSITION
 'IN#(205) = HOME COMPLETE
 'IN#(206) = MOTOR ENABLED
 'IN#(207) = FAULT PRESENT
 'IN#(215) = TOOL IN POCKET (1 = TOOL PRESENT IN CURRENT POCKET)
+'IN#(216) = TOOL ENGAGE ECHO (MIRRORS OUT#213)
 'IN#(209)-IN#(211) = STATE (0=DISABLED, 1=HOMING, 2=IDLE,
 '                     3=MOVING, 4=AT_TOOL, 5=FAULTED)
 '
@@ -195,7 +199,8 @@ END</code></pre>
 *Single job for full tool change. Alternative: call TC_PUT_AWAY_TOOL then TC_GRAB_TOOL (see 3.5–3.6).*  
 *Before calling: set B009 = new tool (1–6). If spindle has a tool, set B011 = current tool.*  
 *Replace `<Placeholder HAS_TOOL>` with your spindle tool-loaded check (e.g. `IN#(xxx)`).*  
-*Replace `OT#(xxx)` with your spindle release output.*
+*Replace `OT#(xxx)` with your spindle release output.*  
+*This example uses Tool Engage (`OUT#213` / `OG#(27)=16`) with echo verify (`IN#216`) during put/pull contact.*
 
 <pre><code>/JOB
 //NAME TC_CHANGE_TOOL
@@ -223,6 +228,8 @@ DOUT OG#(26) B010  <span style="color:magenta">'Tool Select</span>
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 IF IN#(215)=ON,JMP *POCKET_OCCUPIED  <span style="color:magenta">'Tool In Pocket (must be empty)</span>
+DOUT OG#(27) 17  <span style="color:magenta">'Execute + Tool Engage</span>
+WAIT IN#(216)=ON  <span style="color:magenta">'Tool Engage Echo</span>
 <span style="color:blue">MOVL</span> P001 V=100 PL=0  <span style="color:magenta">'P_LOW_IN</span>
 DOUT OT#(xxx) ON  <span style="color:magenta">'Spindle Release</span>
 TIMER T=0.50
@@ -245,6 +252,8 @@ DOUT OT#(xxx) OFF  <span style="color:magenta">'Spindle Grab</span>
 WAIT &lt;Placeholder HAS_TOOL&gt;=ON
 TIMER T=0.20
 <span style="color:blue">MOVL</span> P000 V=100 PL=0  <span style="color:magenta">'P_LOW_OUT</span>
+DOUT OG#(27) 1  <span style="color:magenta">'Execute on, Tool Engage off</span>
+WAIT IN#(216)=OFF  <span style="color:magenta">'Tool Engage Echo</span>
 DOUT OG#(27) 0  <span style="color:magenta">'Execute off</span>
 TIMER T=0.05
 SET B011 B009
@@ -282,7 +291,8 @@ END</code></pre>
 ### 3.5 Put Away Tool Only
 
 *Puts the current tool into its pocket and retracts. Does not grab a new tool.*  
-*Before calling: set B011 = current tool in spindle (1–6).*
+*Before calling: set B011 = current tool in spindle (1–6).*  
+*This example asserts Tool Engage (`OUT#213`) during release/contact and confirms `IN#216` echo.*
 
 <pre><code>/JOB
 //NAME TC_PUT_AWAY_TOOL
@@ -304,11 +314,15 @@ DOUT OG#(26) B011  <span style="color:magenta">'Tool Select (put-away pocket)</s
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
 IF IN#(215)=ON,JMP *POCKET_OCCUPIED  <span style="color:magenta">'Tool In Pocket (must be empty)</span>
+DOUT OG#(27) 17  <span style="color:magenta">'Execute + Tool Engage</span>
+WAIT IN#(216)=ON  <span style="color:magenta">'Tool Engage Echo</span>
 <span style="color:blue">MOVL</span> P001 V=100 PL=0  <span style="color:magenta">'P_LOW_IN</span>
 DOUT OT#(xxx) ON  <span style="color:magenta">'Spindle Release</span>
 TIMER T=0.50
 <span style="color:blue">MOVL</span> P002 V=100 PL=0  <span style="color:magenta">'P_HIGH_IN</span>
 <span style="color:blue">MOVL</span> P000 V=100 PL=0  <span style="color:magenta">'P_LOW_OUT</span>
+DOUT OG#(27) 1  <span style="color:magenta">'Execute on, Tool Engage off</span>
+WAIT IN#(216)=OFF  <span style="color:magenta">'Tool Engage Echo</span>
 DOUT OG#(27) 0  <span style="color:magenta">'Execute off</span>
 SET B011 0  <span style="color:magenta">'Sync: spindle now empty after put away</span>
 *DONE
@@ -324,7 +338,8 @@ END</code></pre>
 ### 3.6 Grab Tool Only
 
 *Rotates to the requested tool and grabs it. Verifies spindle is empty before proceeding. Approaches from high in, then descends to low in.*  
-*Before calling: set B009 = tool to grab (1–6).*
+*Before calling: set B009 = tool to grab (1–6).*  
+*This example asserts Tool Engage (`OUT#213`) during grab/contact and confirms `IN#216` echo.*
 
 <pre><code>/JOB
 //NAME TC_GRAB_TOOL
@@ -343,12 +358,16 @@ TIMER T=0.02
 DOUT OG#(26) B009  <span style="color:magenta">'Tool Select</span>
 WAIT IN#(204)=ON  <span style="color:magenta">'At Position</span>
 TIMER T=0.05
+DOUT OG#(27) 17  <span style="color:magenta">'Execute + Tool Engage</span>
+WAIT IN#(216)=ON  <span style="color:magenta">'Tool Engage Echo</span>
 <span style="color:blue">MOVL</span> P002 V=100 PL=0  <span style="color:magenta">'P_HIGH_IN (approach from above)</span>
 <span style="color:blue">MOVL</span> P001 V=100 PL=0  <span style="color:magenta">'P_LOW_IN (descend, grab)</span>
 DOUT OT#(xxx) OFF  <span style="color:magenta">'Spindle Grab</span>
 WAIT &lt;Placeholder HAS_TOOL&gt;=ON
 TIMER T=0.20
 <span style="color:blue">MOVL</span> P000 V=100 PL=0  <span style="color:magenta">'P_LOW_OUT</span>
+DOUT OG#(27) 1  <span style="color:magenta">'Execute on, Tool Engage off</span>
+WAIT IN#(216)=OFF  <span style="color:magenta">'Tool Engage Echo</span>
 DOUT OG#(27) 0  <span style="color:magenta">'Execute off</span>
 SET B011 B009
 RET
@@ -389,8 +408,9 @@ END</code></pre>
 | OG#(27) | out | 1 | 1 | Execute Move |
 | OG#(27) | out | 1 | 2 | Home Request |
 | OG#(27) | out | 1 | 8 | Clear Faults |
+| OG#(27) | out | 1 | 16 | Tool Engage (ignore AT_TOOL HLFB drop fault) |
 | IG#26 | in | 0 | bits 0–7 | Current Tool, At Position, Home Complete, Motor Enabled, Fault, In Motion |
-| IG#27 | in | 1 | bits 0–7 | State, Invalid Tool, Not Ready, E-Stop, Tool In Pocket |
+| IG#27 | in | 1 | bits 0–7 | State, Invalid Tool, Not Ready, E-Stop, Tool In Pocket, Tool Engage Echo |
 
 ---
 
@@ -419,6 +439,7 @@ END</code></pre>
 | Execute | OUT | 209 | Triggers move |
 | Home Request | OUT | 210 | Rising edge starts homing |
 | Clear Faults | OUT | 212 | Rising edge clears faults |
+| Tool Engage | OUT | 213 | Hold ON during tool put/pull to suppress AT_TOOL HLFB-drop fault |
 | Current Tool | IN | 201–203 | Bits 0–2 |
 | At Position | IN | 204 | Turret settled |
 | Home Complete | IN | 205 | Homing done |
@@ -427,3 +448,4 @@ END</code></pre>
 | In Motion | IN | 208 | Turret rotating |
 | State | IN | 209–211 | 0–5 (DISABLED…FAULTED) |
 | Tool In Pocket | IN | 215 | 1 = tool present in current pocket |
+| Tool Engage Echo | IN | 216 | Mirrors OUT#213 (Tool Engage command accepted/active) |
