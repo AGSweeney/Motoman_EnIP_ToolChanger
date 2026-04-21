@@ -16,15 +16,10 @@
 /* Tool changer wrapper -- provides ToolChanger_*() API and constants */
 #include "ports/ClearCore/clearcore_wrapper.h"
 
-/* HMI display -- 4D Systems Gen4-uLCD-70DCT-CLB on COM-0 */
-#include "toolchanger_hmi.h"
-
 /* State name lookup for debug printing */
 static const char *tc_state_names[] = {
     "DISABLED", "HOMING", "IDLE", "MOVING", "AT_TOOL", "FAULTED"
 };
-
-/* (Touch command handler removed -- HMI is status-only) */
 
 int main(void) {
     /* ================================================================
@@ -51,39 +46,36 @@ int main(void) {
     ConnectorUsb.SendLine("========================================\r\n");
 
     ConnectorUsb.SendLine("Motor M-0 configured (Step+Dir, HLFB bipolar PWM)");
-    ConnectorUsb.SendLine("Waiting for Ethernet link...");
-    ConnectorUsb.Flush();
 
-    uint32_t linkWaitStart = Milliseconds();
-    while (!EthernetMgr.PhyLinkActive()) {
-        if (Milliseconds() - linkWaitStart > 5000) {
-            ConnectorUsb.SendLine("ERROR: Ethernet link timeout!");
-            while (true) {
-                Delay_ms(1000);
-            }
-        }
-        Delay_ms(100);
-    }
-
-    ConnectorUsb.SendLine("Ethernet link detected!\r\n");
+    /* Bring up lwIP + GMAC first; PHY may still be down until the switch is ready. */
+    ConnectorUsb.SendLine("Starting network stack...");
     ConnectorUsb.Flush();
 
     EthernetMgr.Setup();
     Delay_ms(100);
 
-    ConnectorUsb.SendLine("Initializing network (OpENer will load saved config or use defaults)...");
-    bool dhcpSuccess = EthernetMgr.DhcpBegin();
-    if (!dhcpSuccess) {
-        ConnectorUsb.SendLine("DHCP failed, using default static IP");
-        IpAddress ip = IpAddress(192, 168, 1, 100);
-        EthernetMgr.LocalIp(ip);
-        EthernetMgr.NetmaskIp(IpAddress(255, 255, 255, 0));
-        EthernetMgr.GatewayIp(IpAddress(192, 168, 1, 1));
-    } else {
-        ConnectorUsb.SendLine("DHCP successful (default, may be overridden by saved config)");
-    }
+    /* Wait for PHY before OpENer init: NvdataLoad + IfaceApplyConfiguration may
+     * run DHCP (only when NV / default config says DHCP), which needs link. */
+    ConnectorUsb.SendLine("Waiting for Ethernet link...");
+    ConnectorUsb.Flush();
+    {
+        const uint32_t kLinkPollMs        = 100;
+        const uint32_t kLinkStatusEveryMs = 10000;
+        uint32_t       lastStatusPrint    = Milliseconds();
 
-    Delay_ms(500);
+        while (!EthernetMgr.PhyLinkActive()) {
+            uint32_t now = Milliseconds();
+            if (now - lastStatusPrint >= kLinkStatusEveryMs) {
+                ConnectorUsb.SendLine(
+                    "... still waiting for Ethernet link (cable / switch PHY)");
+                ConnectorUsb.Flush();
+                lastStatusPrint = now;
+            }
+            Delay_ms(kLinkPollMs);
+        }
+    }
+    ConnectorUsb.SendLine("Ethernet link detected.");
+    ConnectorUsb.Flush();
 
     struct netif *netif = EthernetMgr.MacInterface();
     if (netif == nullptr) {
@@ -93,8 +85,19 @@ int main(void) {
         }
     }
 
+    /* TCP/IP (DHCP vs static IP) is decided from EEPROM / CIP TCP/IP object in
+     * opener_init -> NvdataLoad -> IfaceApplyConfiguration — not here. */
+    ConnectorUsb.SendLine(
+        "\r\n--- Initializing OpENer (NV TCP/IP: DHCP or static per stored config) ---\r\n");
+    ConnectorUsb.Flush();
+
+    opener_init(netif);
+
+    Delay_ms(500);
+    ConnectorUsb.Flush();
+
     if (netif->ip_addr.addr != 0) {
-        char ipStr[20];
+        char ipStr[48];
         snprintf(ipStr, sizeof(ipStr), "IP Address: %d.%d.%d.%d",
                  ip4_addr1(&netif->ip_addr),
                  ip4_addr2(&netif->ip_addr),
@@ -105,14 +108,6 @@ int main(void) {
         ConnectorUsb.SendLine("WARNING: IP address not assigned yet");
     }
 
-    ConnectorUsb.SendLine("\r\n--- Initializing OpENer ---\r\n");
-    ConnectorUsb.Flush();
-
-    opener_init(netif);
-
-    Delay_ms(500);
-    ConnectorUsb.Flush();
-
     int opener_status = opener_get_status();
     if (opener_status == 0) {
         ConnectorUsb.SendLine("OpENer init: SUCCESS (g_end_stack=0)");
@@ -121,12 +116,6 @@ int main(void) {
         snprintf(statusMsg, sizeof(statusMsg), "OpENer init: FAILED (g_end_stack=%d)", opener_status);
         ConnectorUsb.SendLine(statusMsg);
     }
-    /* ---- Initialise HMI display (COM-0, 115200 baud) ---- */
-    ConnectorUsb.SendLine("Initializing HMI display (COM-0)...");
-    ConnectorUsb.Flush();
-    HMI_Init(115200);
-    ConnectorUsb.SendLine("HMI display ready.");
-
     ConnectorUsb.SendLine("\r\n--- Initialization complete -- entering main loop ---\r\n");
     ConnectorUsb.Flush();
 
@@ -208,9 +197,6 @@ int main(void) {
             lastStatusPrint = currentTime;
         }
 
-        /* HMI display update (internally throttled to ~20 Hz) */
-        HMI_Cyclic();
-        
         /* Minimal delay -- EthernetMgr.Refresh() and opener_cyclic()
          * need frequent calls for responsive EIP communication. */
         Delay_ms(1);

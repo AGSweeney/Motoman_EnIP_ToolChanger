@@ -6,10 +6,6 @@ Device_Startup\startup_same53.c
 
 main.cpp
 
-diablo16_serial.cpp
-
-toolchanger_hmi.cpp
-
 OpENer\source\src\cip\appcontype.c
 
 OpENer\source\src\cip\cipassembly.c

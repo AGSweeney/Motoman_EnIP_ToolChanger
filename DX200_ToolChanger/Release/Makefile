@@ -50,8 +50,6 @@ SUBDIRS :=  \
 C_SRCS +=  \
 ../Device_Startup/startup_same53.c \
 ../main.cpp \
-../diablo16_serial.cpp \
-../toolchanger_hmi.cpp \
 ../OpENer/source/src/cip/appcontype.c \
 ../OpENer/source/src/cip/cipassembly.c \
 ../OpENer/source/src/cip/cipclass3connection.c \
@@ -101,8 +99,6 @@ ASM_SRCS +=
 OBJS +=  \
 Device_Startup/startup_same53.o \
 main.o \
-diablo16_serial.o \
-toolchanger_hmi.o \
 OpENer/source/src/cip/appcontype.o \
 OpENer/source/src/cip/cipassembly.o \
 OpENer/source/src/cip/cipclass3connection.o \
@@ -145,8 +141,6 @@ OpENer/source/src/utils/xorshiftrandom.o
 OBJS_AS_ARGS +=  \
 Device_Startup/startup_same53.o \
 main.o \
-diablo16_serial.o \
-toolchanger_hmi.o \
 OpENer/source/src/cip/appcontype.o \
 OpENer/source/src/cip/cipassembly.o \
 OpENer/source/src/cip/cipclass3connection.o \
@@ -189,8 +183,6 @@ OpENer/source/src/utils/xorshiftrandom.o
 C_DEPS +=  \
 Device_Startup/startup_same53.d \
 main.d \
-diablo16_serial.d \
-toolchanger_hmi.d \
 OpENer/source/src/cip/appcontype.d \
 OpENer/source/src/cip/cipassembly.d \
 OpENer/source/src/cip/cipclass3connection.d \
@@ -233,8 +225,6 @@ OpENer/source/src/utils/xorshiftrandom.d
 C_DEPS_AS_ARGS +=  \
 Device_Startup/startup_same53.d \
 main.d \
-diablo16_serial.d \
-toolchanger_hmi.d \
 OpENer/source/src/cip/appcontype.d \
 OpENer/source/src/cip/cipassembly.d \
 OpENer/source/src/cip/cipclass3connection.d \
@@ -303,20 +293,6 @@ Device_Startup/startup_same53.o: ../Device_Startup/startup_same53.c
 	
 
 ./main.o: .././main.cpp
-	@echo Building file: $<
-	@echo Invoking: ARM/GNU C Compiler : 6.3.1
-	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-g++.exe$(QUOTE) -mthumb -D__SAME53N19A__ -DNDEBUG -DCLEARCORE -DRESTRICT=__restrict -DOPENER_WITH_TRACES -DOPENER_TRACE_LEVEL=0x01  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include" -I"../../libClearCore/inc" -I"../../LwIP/LwIP/src/include" -I"../../LwIP/LwIP/port/include" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore\dx200_toolchanger" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\utils" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\enet_encap" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\5.4.0\CMSIS\Core\Include"  -O3 -ffunction-sections -fno-rtti -fno-exceptions -Wall -mcpu=cortex-m4 -c -std=gnu++11 -fno-threadsafe-statics -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
-	@echo Finished building: $<
-	
-
-./diablo16_serial.o: .././diablo16_serial.cpp
-	@echo Building file: $<
-	@echo Invoking: ARM/GNU C Compiler : 6.3.1
-	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-g++.exe$(QUOTE) -mthumb -D__SAME53N19A__ -DNDEBUG -DCLEARCORE -DRESTRICT=__restrict -DOPENER_WITH_TRACES -DOPENER_TRACE_LEVEL=0x01  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include" -I"../../libClearCore/inc" -I"../../LwIP/LwIP/src/include" -I"../../LwIP/LwIP/port/include" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore\dx200_toolchanger" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\utils" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\enet_encap" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\5.4.0\CMSIS\Core\Include"  -O3 -ffunction-sections -fno-rtti -fno-exceptions -Wall -mcpu=cortex-m4 -c -std=gnu++11 -fno-threadsafe-statics -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
-	@echo Finished building: $<
-	
-
-./toolchanger_hmi.o: .././toolchanger_hmi.cpp
 	@echo Building file: $<
 	@echo Invoking: ARM/GNU C Compiler : 6.3.1
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-g++.exe$(QUOTE) -mthumb -D__SAME53N19A__ -DNDEBUG -DCLEARCORE -DRESTRICT=__restrict -DOPENER_WITH_TRACES -DOPENER_TRACE_LEVEL=0x01  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include" -I"../../libClearCore/inc" -I"../../LwIP/LwIP/src/include" -I"../../LwIP/LwIP/port/include" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\ports\ClearCore\dx200_toolchanger" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\utils" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\cip" -I"Z:\Motoman_EnIP_ToolChanger\DX200_ToolChanger\OpENer\source\src\enet_encap" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\5.4.0\CMSIS\Core\Include"  -O3 -ffunction-sections -fno-rtti -fno-exceptions -Wall -mcpu=cortex-m4 -c -std=gnu++11 -fno-threadsafe-statics -nostdlib --param max-inline-insns-single=500 -MMD -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
