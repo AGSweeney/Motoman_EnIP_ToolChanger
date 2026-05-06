@@ -377,7 +377,9 @@ EipBool8 BeforeAssemblyDataSend(CipInstance *pa_pstInstance) {
 
     /* Byte 0: status bits */
     g_assembly_data_input[0]  = (current_tool & 0x07);
-    if (state == TC_STATE_AT_TOOL) {
+    /* Assert At Position when explicitly at tool, and also after a successful
+     * home while stationary (state becomes IDLE at homing completion). */
+    if (state == TC_STATE_AT_TOOL || (home_complete && !is_moving)) {
       g_assembly_data_input[0] |= IN_AT_POSITION_BIT;
     }
     if (home_complete) {

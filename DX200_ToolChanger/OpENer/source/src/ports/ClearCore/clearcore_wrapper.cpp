@@ -189,9 +189,11 @@ extern "C" {
  *   Max velocity:       500 RPM      -> 500  * 3600 / 60 = 30 000 pulses/sec
  *   Max acceleration: 1 000 RPM/s^2  -> 1000 * 3600 / 60 = 60 000 pulses/sec^2
  *   Homing velocity:    ~33 RPM      ->   33 * 3600 / 60 =  2 000 pulses/sec   */
-static const int32_t TC_VEL_MAX         = 10000;   /* 500/3 RPM   pre-gearbox      */
-static const int32_t TC_ACCEL_MAX       = 60000;   /* 1000 RPM/s^2 pre-gearbox   */
+static const int32_t TC_VEL_MAX         = 30000;   /* 500/2 RPM   pre-gearbox      */
+static const int32_t TC_ACCEL_MAX       = 90000;   /* 1500 RPM/s^2 pre-gearbox   */
 static const int32_t TC_HOME_VEL        = 2000;    /* ~33 RPM  pre-gearbox       */
+/* Extra positive travel after DI-6 clears before reversing to seek home. */
+static const int32_t TC_HOME_CLEARANCE_COUNTS = 3000;
 
 /* Absolute positions for each tool pocket (0-indexed internally) */
 static const int32_t toolPositions[TC_TOOL_COUNT] = {
@@ -218,7 +220,8 @@ static int8_t           tc_move_dir      = 0;  /* +1 = CW, -1 = CCW, 0 = stopped
 
 /* Homing sub-phase:
  *   0 = move off sensor (if already on it)
- *   1 = seek sensor (normal homing search) */
+ *   1 = seek sensor (normal homing search)
+ *   2 = move farther away after clearing sensor, then seek */
 static int              tc_home_phase   = 0;
 
 /* DI-8 hardware enable tracking */
@@ -593,13 +596,16 @@ void ToolChanger_Cyclic(void) {
                 /* Phase 0: moving OFF the sensor (positive direction),
                  * bounded to one tool pocket width (6000 counts). */
                 if (!ConnectorDI6.State()) {
-                    /* Cleared the sensor -- stop the bounded move and
-                     * reverse to seek the sensor edge slowly. */
+                    /* Cleared the sensor. Move a bit farther away first to
+                     * avoid immediately re-triggering on switch hysteresis
+                     * before starting the reverse seek. */
                     TC_MOTOR.MoveStopAbrupt();
-                    tc_home_phase = 1;
-                    TC_MOTOR.MoveVelocity(-TC_HOME_VEL);
-                    TC_LOG("TC_Cyclic: Cleared home sensor, "
-                                      "now seeking edge\n");
+                    tc_home_phase = 2;
+                    TC_MOTOR.Move(TC_HOME_CLEARANCE_COUNTS,
+                                  MotorDriver::MOVE_TARGET_REL_END_POSN);
+                    TC_LOG("TC_Cyclic: Cleared home sensor, moving +%ld counts "
+                                      "for clearance before seek\n",
+                                      (long)TC_HOME_CLEARANCE_COUNTS);
                 } else if (TC_MOTOR.StepsComplete() &&
                            TC_MOTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) {
                     /* Moved a full pocket width and sensor is still active
@@ -610,6 +616,15 @@ void ToolChanger_Cyclic(void) {
                     TC_LOG("TC_Cyclic: HOME SENSOR STUCK -- "
                                       "DI-6 did not clear within %ld counts\n",
                                       (long)TC_COUNTS_PER_TOOL);
+                }
+            } else if (tc_home_phase == 2) {
+                /* Phase 2: completed extra move-off clearance. Now reverse
+                 * and seek the home sensor edge in the negative direction. */
+                if (TC_MOTOR.StepsComplete() &&
+                    TC_MOTOR.HlfbState() == MotorDriver::HLFB_ASSERTED) {
+                    tc_home_phase = 1;
+                    TC_MOTOR.MoveVelocity(-TC_HOME_VEL);
+                    TC_LOG("TC_Cyclic: Clearance complete, now seeking edge\n");
                 }
             } else {
                 /* Phase 1: seeking the sensor (negative direction).
