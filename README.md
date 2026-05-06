@@ -3,7 +3,9 @@
 <p align="center">
   <img src="images/TC_Render.png" alt="Tool Changer Rendering" width="600">
 </p>
-
+<p align="center">
+  https://youtu.be/3cAVqeorTU8?si=m8h9ca7sfkMtxQVy
+</p>
 EtherNet/IP adapter firmware for a 6-pocket rotary tool changer, built on a Teknic ClearCore controller and the OpENer open-source EtherNet/IP stack. Designed to interface with a Yaskawa Motoman DX200 robot controller.
 
 ## System Overview
