@@ -2,12 +2,12 @@
 
 ### Entry Point
 - Production entry point: `TOOLCHANGE_V2` (call with requested tool as arg #1).
-- Wrapper entry point: `ARGPASS` (for callers writing request into `ARGF5`).
-- Motion demo/commissioning flow: `SAMPLE_TC` (explicit 2-phase unload/load around `TOOLCHANGE_V2`).
+- Complete station flow entry point: `TC_FULL_CHANGE` (arg #1 = requested tool, includes approach/retract motion).
 
 ### Pre-Check
 - Confirm `TC_CHK_READY`, `TC_SET_TOOL_INDEX`, `TC_VERIFY_TOOL`, `TC_RECOVER`, `TC_PHASE1_UNLOAD`, `TC_PHASE2_LOAD`, and `TOOLCHANGE_V2` are loaded on controller.
-- Confirm `SAMPLE_TC` and `ARGPASS` call `TOOLCHANGE_V2`.
+- Confirm `TC_FULL_CHANGE` is loaded.
+- Confirm `TC_FULL_CHANGE` calls `TOOLCHANGE_V2`.
 - Confirm EtherNet/IP mapping matches `TCVars_DX200MH180.xlsx`:
   - `IN#(204)` at-position
   - `IN#(205)` home complete
@@ -70,6 +70,14 @@
   - `IN#(194)` transitions ON (tool locked).
   - `IN#(196)` transitions OFF (tool loaded).
   - `B098 = 0`.
+
+### Test 8: Complete Station Program (`TC_FULL_CHANGE`)
+- Call `TC_FULL_CHANGE` with valid tool request arg (1..6) from a safe approach condition.
+- Expected:
+  - robot executes approach, exchange, and retreat moves.
+  - `TC_PHASE1_UNLOAD` and `TC_PHASE2_LOAD` both run (or unload is skipped if already empty).
+  - `TOOLCHANGE_V2` runs and returns success (`B098=0`).
+  - final `B098 = 0` and spindle reports tool locked (`IN#194=ON`, `IN#196=OFF`).
 
 ### Result Logging Template
 - Date/Time:

@@ -41,7 +41,7 @@
 7. call `TC_VERIFY_TOOL`
 8. if verify passes, complete successfully
 
-### 2-Phase Station Flow (`SAMPLE_TC`)
+### 2-Phase Station Flow (`TC_FULL_CHANGE`)
 1. approach station and move to pre-exchange pose
 2. call `TC_PHASE1_UNLOAD`:
    - if spindle already empty (`IN#196=ON`), skip unload actions
@@ -52,6 +52,32 @@
    - close drawbar/return path
    - confirm tool locked (`IN#194=ON`) and not empty (`IN#196=OFF`)
 6. leave station
+
+### Simple Station Steps (P0XX Positions)
+
+#### A) No Previous Tool Loaded (load-only path)
+1. Move to station entry path, then to `P024` (high-out approach for empty spindle).
+2. Move to `P027` (toolchange/exchange position).
+3. Run tool index command (`TOOLCHANGE_V2`) for requested tool.
+4. Move to `P026` (retract after index).
+5. Run `TC_PHASE2_LOAD` to grab and lock new tool.
+6. Move out through `P025`, then `P024`, then depart station.
+
+#### B) Previous Tool Loaded (full unload + load path)
+1. Move to station entry path, then to `P025` (pre-exchange approach).
+2. Move to `P026` (release/unload height).
+3. Run `TC_PHASE1_UNLOAD` to release current tool and confirm spindle empty.
+4. Move to `P027` (toolchange/exchange position).
+5. Run tool index command (`TOOLCHANGE_V2`) for requested tool.
+6. Move back to `P026` (retract before pickup lock).
+7. Run `TC_PHASE2_LOAD` to grab and lock new tool.
+8. Move out through `P025`, then `P024`, then depart station.
+
+#### P0XX Quick Reference
+- `P024`: high-out approach/retract (used for empty-spindle load-only path and safe exit)
+- `P025`: pre-exchange approach point
+- `P026`: unload/retract point
+- `P027`: exchange/index point at toolchanger
 
 ### Retry and Recovery Flow
 1. if `TC_VERIFY_TOOL` fails, run recovery (`TC_RECOVER`)
@@ -75,6 +101,4 @@
 - `TC_HARDENED/TOOLCHANGE_V2.JBI`: main orchestrator
 
 ### Integration
-- `TC_HARDENED/SAMPLE_TC.JBI` calls `TOOLCHANGE_V2`
-- `TC_HARDENED/ARGPASS.JBI` calls `TOOLCHANGE_V2`
-- `TC_HARDENED/TOOLCHANGE.JBI` remains available for rollback safety
+- `TC_HARDENED/TC_FULL_CHANGE.JBI` is the complete station entrypoint (motion + phase1 + index + phase2)

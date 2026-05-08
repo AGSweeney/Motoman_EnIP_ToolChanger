@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hardened Toolchanger - Controller View</title>
+  <style>
+    :root {
+      --bg: #f6f8fc;
+      --panel: #ffffff;
+      --text: #1b2435;
+      --muted: #4b5b7d;
+      --cmd: #005cc5;
+      --io: #b31d5c;
+      --num: #8a5200;
+      --comment: #1a7f37;
+      --label: #6f42c1;
+      --motion: #0c7cba;
+      --border: #c8d2e6;
+    }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Consolas, "Courier New", monospace;
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1, h2 {
+      margin: 0 0 12px 0;
+      font-family: Segoe UI, Arial, sans-serif;
+    }
+    h1 { font-size: 24px; }
+    h2 { font-size: 18px; margin-top: 24px; }
+    .sub {
+      color: var(--muted);
+      margin-bottom: 14px;
+      font-family: Segoe UI, Arial, sans-serif;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 18px;
+      font-family: Segoe UI, Arial, sans-serif;
+      font-size: 13px;
+    }
+    .chip {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .code-wrap {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .code-title {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      background: #eaf0ff;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+    pre {
+      margin: 0;
+      padding: 10px 12px;
+      overflow: auto;
+      line-height: 1.35;
+      font-size: 12px;
+      white-space: pre;
+    }
+    .cmd { color: var(--cmd); font-weight: 700; }
+    .io { color: var(--io); font-weight: 700; }
+    .num { color: var(--num); }
+    .comment { color: var(--comment); }
+    .label { color: var(--label); font-weight: 700; }
+    .motion { color: var(--motion); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Hardened Toolchanger - Controller Style View</h1>
+  <div class="sub">Controller-like coloring for the active hardened jobs.</div>
+
+  <div class="legend">
+    <div class="chip"><span class="cmd">Commands</span></div>
+    <div class="chip"><span class="motion">Motion</span></div>
+    <div class="chip"><span class="io">I/O + Registers</span></div>
+    <div class="chip"><span class="comment">Pendant comments</span></div>
+  </div>
+
+  <div id="code-root"></div>
+
+  <textarea id="src-tc_full_change" hidden>/JOB
+//NAME TC_FULL_CHANGE
+//POS
+///NPOS 2,0,0,4,0,0
+///TOOL 1
+///POSTYPE PULSE
+///PULSE
+C00000=134228,5015,-129062,-137591,141260,38873
+C00001=134230,5015,-129062,-137594,141259,38870
+///POSTYPE BASE
+///RECTAN
+///RCONF 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+P00024=754.999,1320.999,-329.000,-179.9987,-0.0019,-0.0018
+P00025=755.000,1321.000,-446.500,-179.9988,-0.0019,-0.0019
+P00026=768.500,1482.000,-446.500,179.9936,-0.0142,-0.0149
+P00027=768.500,1482.000,-329.107,179.9943,-0.0139,-0.0147
+//ARGINFO
+///ARGTYPE B,,,,,,,
+///COMMENT
+TOOL NUMBER
+//INST
+///DATE 2026/05/08 09:42
+///ATTR SC,RW
+///GROUP1 RB1
+///LVARS 1,0,0,0,0,0,0,0
+NOP
+'TC_FULL_CHANGE PURPOSE:
+'COMPLETE STATION TOOLCHANGE PROGRAM (MOTION + I/O + VERIFY)
+'ARG#1 = REQUESTED TOOL NUMBER (1..6)
+'B098 CODES:
+' 0   = SUCCESS
+' 71  = INVALID REQUESTED TOOL
+' 72  = CHANGER NOT READY BEFORE APPROACH
+' 73  = PHASE 1 UNLOAD FAILURE
+' 74  = INDEX/VERIFY FAILURE IN TOOLCHANGE_V2
+' 75  = PHASE 2 LOAD FAILURE
+'READ REQUESTED TOOL ARG#1
+GETARG LB000 IARG#(1)
+SET B009 LB000
+SET B098 0
+'VALIDATE REQUESTED TOOL RANGE
+IFTHENEXP B009&lt;1
+  SET B098 71
+  RET
+ENDIF
+IFTHENEXP B009&gt;6
+  SET B098 71
+  RET
+ENDIF
+'PRE-CHECK CHANGER READY BEFORE ENTERING STATION
+CALL JOB:TC_CHK_READY
+IFTHENEXP B098&lt;&gt;0
+  SET B098 72
+  RET
+ENDIF
+'MOVE TO STATION APPROACH
+MOVJ C00000 VJ=0.78 PL=0
+'IF SPINDLE IS EMPTY/UNLOCKED, USE HIGH-OUT APPROACH FOR LOAD-ONLY PATH
+IFTHENEXP IN#(196)=ON
+  JMP *LOAD_ONLY_APPROACH
+ENDIF
+IFTHENEXP IN#(194)=OFF
+  JMP *LOAD_ONLY_APPROACH
+ENDIF
+MOVJ P025 VJ=25.00 PL=0
+'UNLOAD PATH: MOVE INTO RELEASE POSITION AND RUN PHASE 1
+DOUT OT#(186) OFF
+TIMER T=0.10
+MOVL P026 V=200.0 PL=0
+CALL JOB:TC_PHASE1_UNLOAD
+IFTHENEXP B098&lt;&gt;0
+  SET B098 73
+  RET
+ENDIF
+JMP *SKIP_UNLOAD
+*LOAD_ONLY_APPROACH
+MOVL P024 V=300.0 PL=0
+*SKIP_UNLOAD
+'MOVE TO EXCHANGE POSITION
+MOVL P027 V=300.0 PL=0
+'INDEX CHANGER TO REQUESTED TOOL (USES B009)
+SET I025 B009
+CALL JOB:TOOLCHANGE_V2 ARGFI025
+IFTHENEXP B098&lt;&gt;0
+  MOVL P026 V=300.0 PL=0
+  SET B098 74
+  RET
+ENDIF
+'RETRACT BEFORE LOAD/LOCK PHASE
+MOVL P026 V=300.0 PL=0
+'PHASE 2: GRAB/LOCK NEW TOOL
+CALL JOB:TC_PHASE2_LOAD
+IFTHENEXP B098&lt;&gt;0
+  SET B098 75
+  RET
+ENDIF
+'LEAVE STATION
+MOVL P025 V=300.0 PL=0
+MOVL P024 V=300.0 PL=0
+MOVJ C00001 VJ=35.00 PL=0
+'NORMAL SUCCESS
+SET B098 0
+END</textarea>
+
+  <textarea id="src-toolchange_v2" hidden>/JOB
+//NAME TOOLCHANGE_V2
+//POS
+///NPOS 0,0,0,0,0,0
+//ARGINFO
+///ARGTYPE B,,,,,,,
+///COMMENT
+TOOL NUMBER
+//INST
+///DATE 2026/05/07 12:39
+///ATTR SC,RW
+///GROUP1 RB1
+///LVARS 1,0,0,0,0,0,0,0
+NOP
+'TOOLCHANGE_V2 PURPOSE:
+'MAIN HARDENED TOOL CHANGE ENTRYPOINT
+'- ACCEPTS REQUESTED TOOL ARG
+'- NORMALIZES STALE TOOL STATE USING PHYSICAL SPINDLE INPUTS
+'- ENFORCES READINESS + RECOVERY
+'- COMMANDS TOOL MOVE
+'- VERIFIES RESULT
+'- RETRIES ONCE BEFORE FINAL FAIL
+'KEY REGISTERS:
+'B009 = REQUESTED TOOL
+'B010 = REPORTED/CORRECTED CURRENT TOOL
+'B098 = STATUS CODE FROM HELPER JOBS
+'MSG S010 = READY FAILURE AFTER RECOVERY
+'MSG S011 = READY FAILURE BEFORE RETRY ATTEMPT
+'MSG S012 = VERIFY FAILURE AFTER RETRY
+'READ TOOL REQUEST ARG#1
+GETARG LB000 IARG#(1)
+SET B009 LB000
+'CLEAR STATUS
+SET B098 0
+'SYNC REPORTED TOOL WITH PHYSICAL SPINDLE STATE
+'READ REPORTED TOOL FROM CHANGER
+DIN B010 IG#(30)
+IFTHENEXP IN#(196)=ON
+  'PHYSICALLY EMPTY SPINDLE OVERRIDES STALE REPORTED TOOL
+  SET B010 0
+ENDIF
+IFTHENEXP IN#(194)=OFF
+  'NOT LOCKED ALSO MEANS DO NOT TRUST TOOL-AS-LOADED
+  SET B010 0
+ENDIF
+'ONLY SKIP IF TOOL MATCHES AND SPINDLE IS PHYSICALLY LOADED/LOCKED
+IFTHENEXP B009=B010
+  IFTHENEXP B010&lt;&gt;0
+    'EARLY SUCCESS: REQUESTED TOOL ALREADY PRESENT
+    RET
+  ENDIF
+ENDIF
+'READINESS CHECK
+CALL JOB:TC_CHK_READY
+IFTHENEXP B098&lt;&gt;0
+  'FIRST ESCALATION: TRY RECOVERY BEFORE GIVING UP
+  CALL JOB:TC_RECOVER
+  CALL JOB:TC_CHK_READY
+  IFTHENEXP B098&lt;&gt;0
+    'NOT READY EVEN AFTER RECOVERY
+    MSG S010
+    RET
+  ENDIF
+ENDIF
+'FIRST COMMAND ATTEMPT
+CALL JOB:TC_SET_TOOL_INDEX
+CALL JOB:TC_VERIFY_TOOL
+IFTHENEXP B098=0
+  'SUCCESS ON FIRST TRY
+  RET
+ENDIF
+'RETRY ONCE, THEN COLDSTART PATH INSIDE TC_RECOVER
+'RECOVER + RECHECK BEFORE RETRYING COMMAND
+CALL JOB:TC_RECOVER
+CALL JOB:TC_CHK_READY
+IFTHENEXP B098&lt;&gt;0
+  'COULD NOT RESTORE READY STATE FOR RETRY
+  MSG S011
+  RET
+ENDIF
+'SECOND AND FINAL COMMAND ATTEMPT
+CALL JOB:TC_SET_TOOL_INDEX
+CALL JOB:TC_VERIFY_TOOL
+IFTHENEXP B098&lt;&gt;0
+  'FINAL FAILURE AFTER RETRY
+  MSG S012
+ENDIF
+END</textarea>
+
+  <textarea id="src-tc_chk_ready" hidden>/JOB
+//NAME TC_CHK_READY
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/05/07 12:39
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'TC_CHK_READY PURPOSE:
+'VERIFY ALL REQUIRED CHANGER PERMISSIVES BEFORE ANY TOOL COMMAND
+'RETURNS RESULT IN B098
+' 0  = READY
+' 31 = FAULT PRESENT
+' 32 = MOTOR NOT ENABLED
+' 33 = NOT HOMED
+' 34 = NOT AT POSITION / NOT READY
+'STATUS CODE: B098 (0 = READY)
+SET B098 0
+'FAULT MUST BE CLEAR
+IFTHENEXP IN#(207)=ON
+  SET B098 31
+  'EARLY EXIT ON FIRST FAILED PERMISSIVE
+  RET
+ENDIF
+'MOTOR ENABLE MUST BE TRUE
+IFTHENEXP IN#(206)=OFF
+  SET B098 32
+  'EARLY EXIT ON FIRST FAILED PERMISSIVE
+  RET
+ENDIF
+'HOME MUST BE COMPLETE
+IFTHENEXP IN#(205)=OFF
+  SET B098 33
+  'EARLY EXIT ON FIRST FAILED PERMISSIVE
+  RET
+ENDIF
+'TOOL CHANGER MUST BE READY/AT POSITION
+IFTHENEXP IN#(204)=OFF
+  SET B098 34
+  'EARLY EXIT ON FIRST FAILED PERMISSIVE
+  RET
+ENDIF
+END</textarea>
+
+  <textarea id="src-tc_set_tool_index" hidden>/JOB
+//NAME TC_SET_TOOL_INDEX
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/05/07 12:39
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'TC_SET_TOOL_INDEX PURPOSE:
+'ISSUE TOOL INDEX COMMAND TO CHANGER AND WAIT FOR MOTION CYCLE
+'USES B009 AS REQUESTED TOOL NUMBER
+'USES REQUESTED TOOL B009
+SET B098 0
+'WRITE REQUESTED TOOL BITS TO OUTPUT GROUP
+DOUT OG#(26) B009
+'EXECUTE MOVE EDGE
+PULSE OT#(209)
+'EXPECT MOTION TO START AND FINISH
+WAIT IN#(208)=ON
+WAIT IN#(208)=OFF
+'READY BIT MUST RETURN ON
+WAIT IN#(204)=ON
+END</textarea>
+
+  <textarea id="src-tc_verify_tool" hidden>/JOB
+//NAME TC_VERIFY_TOOL
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/05/07 12:39
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'TC_VERIFY_TOOL PURPOSE:
+'VERIFY LOGICAL + PHYSICAL SUCCESS AFTER A TOOL COMMAND
+'B098 CODES:
+' 0  = VERIFY PASS
+' 41 = REPORTED TOOL DOES NOT MATCH REQUEST
+' 45 = TOOL NOT LOCKED (IN#194=OFF)
+' 46 = NO TOOL LOADED (IN#196=ON)
+' 42 = INVALID TOOL BIT SET BY CHANGER
+' 43 = NOT READY BIT SET BY CHANGER
+' 44 = FAULT PRESENT
+'FIRST-FAILURE-WINS: LATER CHECKS ONLY RUN IF B098 IS STILL 0
+'VERIFY REQUEST B009 AGAINST REPORTED IG#(30)
+SET B098 0
+'READ CURRENT TOOL VALUE FROM INPUT GROUP 30
+DIN B010 IG#(30)
+IFTHENEXP B010&lt;&gt;B009
+  SET B098 41
+ENDIF
+IFTHENEXP B098=0
+  'PHYSICAL LOCK MUST BE TRUE
+  IFTHENEXP IN#(194)=OFF
+    SET B098 45
+  ENDIF
+ENDIF
+IFTHENEXP B098=0
+  'SPINDLE MUST NOT REPORT EMPTY
+  IFTHENEXP IN#(196)=ON
+    SET B098 46
+  ENDIF
+ENDIF
+IFTHENEXP B098=0
+  'CHANGER-SIDE INVALID TOOL INDICATION
+  IFTHENEXP IN#(212)=ON
+    SET B098 42
+  ENDIF
+ENDIF
+IFTHENEXP B098=0
+  'CHANGER-SIDE NOT READY INDICATION
+  IFTHENEXP IN#(213)=ON
+    SET B098 43
+  ENDIF
+ENDIF
+IFTHENEXP B098=0
+  'FINAL FAULT CHECK
+  IFTHENEXP IN#(207)=ON
+    SET B098 44
+  ENDIF
+ENDIF
+END</textarea>
+
+  <textarea id="src-tc_recover" hidden>/JOB
+//NAME TC_RECOVER
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/05/07 12:39
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'RECOVER TO A KNOWN READY STATE
+'B098 RETURN CODES:
+' 0  = RECOVERY SUCCESS
+' 91 = FAILED TO REACH READY AFTER RECOVERY STEPS
+SET B098 0
+'TRY SIMPLE FAULT CLEAR FIRST
+IFTHENEXP IN#(207)=ON
+  'SHORT CLEAR PULSE TO RESET LATCHED FAULTS
+  PULSE OT#(212) T=0.05
+  TIMER T=0.10
+ENDIF
+'IF STILL FAULTED, RUN FULL COLDSTART
+IFTHENEXP IN#(207)=ON
+  'ESCALATION PATH
+  CALL JOB:TC_COLDSTART
+ENDIF
+'FINAL READINESS CHECK
+CALL JOB:TC_CHK_READY
+IFTHENEXP B098&lt;&gt;0
+  'NORMALIZE ANY NON-READY RESULT INTO RECOVERY FAILURE CODE
+  SET B098 91
+ENDIF
+END</textarea>
+
+  <textarea id="src-tc_coldstart" hidden>/JOB
+//NAME TC_COLDSTART
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/03/10 13:49
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'TC_COLDSTART PURPOSE:
+'FORCE THE TOOL CHANGER INTO A KNOWN GOOD HOME/IDLE STATE
+'USED AFTER FAULTS OR MAJOR STATE DESYNC CONDITIONS
+MSG S000
+'CLEAR FAULTS IF PRESENT
+MSG S002
+IFTHENEXP IN#(207)=ON
+  PULSE OT#(212) T=0.05
+ENDIF
+'WAIT FAULT OFF
+WAIT IN#(207)=OFF
+TIMER T=0.05
+'WAIT MOTOR ENABLED
+WAIT IN#(206)=ON
+TIMER T=0.05
+'SET NULL TOOL
+DOUT OG#(26) 0
+TIMER T=0.05
+'FLUSH OUTPUT COMMANDS
+DOUT OG#(27) 0
+TIMER T=0.05
+'SET HOME COMMAND
+MSG S003
+DOUT OG#(27) 2
+TIMER T=0.05
+'RESET HOME COMMAND
+DOUT OG#(27) 0
+'WAIT FOR HOME
+WAIT IN#(205)=ON
+TIMER T=0.10
+'WAIT FOR IDLE STATE
+'STATE BITS EXPECTED FOR IDLE:
+'IN#209=OFF, IN#210=ON, IN#211=OFF
+WAIT IN#(209)=OFF
+WAIT IN#(210)=ON
+WAIT IN#(211)=OFF
+'SEND EXECUTE PULSE TO LATCH STABLE STATE
+DOUT OG#(1) 1
+PULSE OT#(209) T=0.50
+MSG S004
+TIMER T=0.50
+MSG S005
+'FINAL CHECK: CHANGER NOT IN MOTION
+WAIT IN#(208)=OFF
+END</textarea>
+
+  <textarea id="src-tc_phase1_unload" hidden>/JOB
+//NAME TC_PHASE1_UNLOAD
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/05/07 13:17
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'PHASE 1 PURPOSE:
+'UNLOAD/PUT-AWAY CURRENT TOOL FROM SPINDLE
+'B098 CODES:
+' 0  = PHASE SUCCESS
+' 51 = SPINDLE DID NOT REPORT EMPTY AFTER UNLOAD
+SET B098 0
+'IF SPINDLE ALREADY EMPTY, SKIP UNLOAD ACTIONS
+IFTHENEXP IN#(196)=ON
+  RET
+ENDIF
+'IF NOT LOCKED, TREAT AS NO TOOL PRESENT AND SKIP UNLOAD
+IFTHENEXP IN#(194)=OFF
+  RET
+ENDIF
+'DISABLE DB RETURN BEFORE EXTEND
+DOUT OT#(186) OFF
+TIMER T=0.10
+'EXTEND DRAWBAR TO RELEASE CURRENT TOOL
+DOUT OT#(185) ON
+TIMER T=0.20
+WAIT IN#(193)=ON
+'CONFIRM SPINDLE IS EMPTY AFTER RELEASE
+WAIT IN#(196)=ON
+IFTHENEXP IN#(196)=OFF
+  SET B098 51
+ENDIF
+END</textarea>
+
+  <textarea id="src-tc_phase2_load" hidden>/JOB
+//NAME TC_PHASE2_LOAD
+//POS
+///NPOS 0,0,0,0,0,0
+//INST
+///DATE 2026/05/07 13:17
+///ATTR SC,RW
+///GROUP1 RB1
+NOP
+'PHASE 2 PURPOSE:
+'LOAD/LOCK NEW TOOL INTO SPINDLE AFTER INDEX CHANGE
+'B098 CODES:
+' 0  = PHASE SUCCESS
+' 61 = TOOL NOT LOCKED AFTER LOAD
+' 62 = SPINDLE STILL REPORTS EMPTY AFTER LOAD
+SET B098 0
+'DROP DRAWBAR EXTEND COMMAND
+DOUT OT#(185) OFF
+TIMER T=0.20
+'ENABLE DB RETURN TO SEAT/LOCK TOOL
+DOUT OT#(186) ON
+TIMER T=0.20
+WAIT IN#(194)=ON
+WAIT IN#(196)=OFF
+IFTHENEXP IN#(194)=OFF
+  SET B098 61
+ENDIF
+IFTHENEXP B098=0
+  IFTHENEXP IN#(196)=ON
+    SET B098 62
+  ENDIF
+ENDIF
+END</textarea>
+
+  <script>
+    const jobs = [
+      ["TC_FULL_CHANGE.JBI", "src-tc_full_change"],
+      ["TOOLCHANGE_V2.JBI", "src-toolchange_v2"],
+      ["TC_CHK_READY.JBI", "src-tc_chk_ready"],
+      ["TC_SET_TOOL_INDEX.JBI", "src-tc_set_tool_index"],
+      ["TC_VERIFY_TOOL.JBI", "src-tc_verify_tool"],
+      ["TC_RECOVER.JBI", "src-tc_recover"],
+      ["TC_COLDSTART.JBI", "src-tc_coldstart"],
+      ["TC_PHASE1_UNLOAD.JBI", "src-tc_phase1_unload"],
+      ["TC_PHASE2_LOAD.JBI", "src-tc_phase2_load"],
+    ];
+
+    function colorize(code) {
+      return code
+        .split("\n")
+        .map((line) => {
+          if (line.startsWith("'")) return `<span class="comment">${line}</span>`;
+          if (line.startsWith("*")) return `<span class="label">${line}</span>`;
+          let out = line;
+          out = out.replace(/\b(MOVJ|MOVL)\b/g, '<span class="motion">$1</span>');
+          out = out.replace(/\b(NOP|SET|GETARG|DIN|DOUT|PULSE|WAIT|IFTHENEXP|ENDIF|CALL|JOB|RET|JMP|TIMER|MSG|END)\b/g, '<span class="cmd">$1</span>');
+          out = out.replace(/\b(IN#\(\d+\)|OT#\(\d+\)|IG#\(\d+\)|OG#\(\d+\)|B\d{3}|I\d{3}|LB\d{3}|P\d{3,5}|C\d{5})\b/g, '<span class="io">$1</span>');
+          out = out.replace(/([=\-]?\d+(?:\.\d+)?)/g, '<span class="num">$1</span>');
+          return out;
+        })
+        .join("\n");
+    }
+
+    const root = document.getElementById("code-root");
+    jobs.forEach(([title, srcId]) => {
+      const raw = document.getElementById(srcId).value;
+      const wrap = document.createElement("section");
+      wrap.className = "code-wrap";
+      wrap.innerHTML = `<div class="code-title">${title}</div><pre>${colorize(raw)}</pre>`;
+      root.appendChild(wrap);
+    });
+  </script>
+</body>
+</html>
